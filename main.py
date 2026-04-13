@@ -11,60 +11,89 @@ def auto_seed():
     from core.security import hash_password
     db = SessionLocal()
     try:
+        # If users already exist, skip entirely
         if db.query(User).first():
             print("✅ DB already seeded")
             return
+
         print("🌱 Seeding...")
-        perms_data = [
-            ("view:inventory","View all assets"),
-            ("view:my_gear","View own assets"),
-            ("create:asset","Add assets"),
-            ("update:asset","Edit assets"),
-            ("delete:asset","Remove assets"),
-            ("manage:users","Manage users"),
-        ]
-        perms = {}
-        for name, desc in perms_data:
-            p = Permission(name=name, description=desc)
-            db.add(p); db.flush(); perms[name] = p
 
-        admin_role = Role(name="Admin")
-        db.add(admin_role); db.flush()
-        admin_role.permissions = list(perms.values())
+        # GET OR CREATE permissions (safe if already exist)
+        def get_or_create_perm(name, desc):
+            p = db.query(Permission).filter(Permission.name == name).first()
+            if not p:
+                p = Permission(name=name, description=desc)
+                db.add(p)
+                db.flush()
+            return p
 
-        emp_role = Role(name="Employee")
-        db.add(emp_role); db.flush()
-        emp_role.permissions = [perms["view:my_gear"]]
+        perms = {
+            name: get_or_create_perm(name, desc)
+            for name, desc in [
+                ("view:inventory", "View all assets"),
+                ("view:my_gear",   "View own assigned assets"),
+                ("create:asset",   "Add new assets"),
+                ("update:asset",   "Edit existing assets"),
+                ("delete:asset",   "Remove assets"),
+                ("manage:users",   "Manage users"),
+            ]
+        }
+
+        # GET OR CREATE roles
+        admin_role = db.query(Role).filter(Role.name == "Admin").first()
+        if not admin_role:
+            admin_role = Role(name="Admin")
+            db.add(admin_role)
+            db.flush()
+            admin_role.permissions = list(perms.values())
+
+        emp_role = db.query(Role).filter(Role.name == "Employee").first()
+        if not emp_role:
+            emp_role = Role(name="Employee")
+            db.add(emp_role)
+            db.flush()
+            emp_role.permissions = [perms["view:my_gear"]]
+
         db.commit()
 
+        # CREATE users
         users_data = [
-            ("Opti Admin",   "admin@gmail.com", "admin123", admin_role.id),
-            ("John","john@gmail.com", "john123", emp_role.id),
-            ("Akash", "akash@gmail.com",   "akash123",   emp_role.id),
-            
+            ("Opti Admin",    "admin@opti.com",  "admin123",  admin_role.id),
+            ("Alice Johnson", "alice@opti.com",  "alice123",  emp_role.id),
+            ("Bob Martinez",  "bob@opti.com",    "bob123",    emp_role.id),
+            ("Carol White",   "carol@opti.com",  "carol123",  emp_role.id),
         ]
         user_map = {}
         for full_name, email, pwd, role_id in users_data:
-            u = User(full_name=full_name, email=email,
-                     hashed_password=hash_password(pwd), role_id=role_id)
-            db.add(u); db.flush(); user_map[email] = u
+            u = db.query(User).filter(User.email == email).first()
+            if not u:
+                u = User(full_name=full_name, email=email,
+                         hashed_password=hash_password(pwd), role_id=role_id)
+                db.add(u)
+                db.flush()
+            user_map[email] = u
         db.commit()
 
+        # CREATE assets
         assets_data = [
             ('MacBook Pro 14"', 'OPTI-001','Laptop',   'assigned', 2499.99, user_map['alice@opti.com'].id),
             ('Dell XPS 15',     'OPTI-002','Laptop',   'assigned', 1899.00, user_map['bob@opti.com'].id),
             ('LG UltraWide',    'OPTI-003','Monitor',  'available', 699.00, None),
             ('iPhone 15 Pro',   'OPTI-004','Phone',    'assigned',  999.00, user_map['carol@opti.com'].id),
+            ('Logitech MX Keys','OPTI-005','Keyboard', 'available', 109.99, None),
             ('Sony WH-1000XM5', 'OPTI-006','Headset',  'assigned',  349.99, user_map['alice@opti.com'].id),
             ('Standing Desk',   'OPTI-007','Furniture','available', 799.00, None),
+            ('Cisco IP Phone',  'OPTI-008','Phone',    'retired',   149.99, None),
             ('Samsung 27" 4K',  'OPTI-009','Monitor',  'assigned',  549.00, user_map['bob@opti.com'].id),
             ('Ergonomic Chair', 'OPTI-010','Furniture','available', 599.00, None),
         ]
         for name, tag, cat, status, value, uid in assets_data:
-            db.add(Asset(name=name, asset_tag=tag, category=cat,
-                         status=status, value=value, assigned_to_id=uid))
+            if not db.query(Asset).filter(Asset.asset_tag == tag).first():
+                db.add(Asset(name=name, asset_tag=tag, category=cat,
+                             status=status, value=value, assigned_to_id=uid))
         db.commit()
         print("✅ Seeded!  admin@opti.com / admin123")
+
     except Exception as e:
         db.rollback()
         print(f"❌ Seed failed: {e}")
