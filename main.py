@@ -15,7 +15,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://your-frontend.vercel.app"
+        "https://opti-frontend-9yw5xih3n-sinchanabk13-5254s-projects.vercel.app"
     ],
     allow_credentials=True,
     allow_methods=["*"],
