@@ -54,10 +54,10 @@ def auto_seed():
         db.commit()
 
         users_data = [
-            ("Opti Admin",    "admin@opti.com",  "admin123",  admin_role.id),
-            ("Alice Johnson", "alice@opti.com",  "alice123",  emp_role.id),
-            ("Bob Martinez",  "bob@opti.com",    "bob123",    emp_role.id),
-            ("Carol White",   "carol@opti.com",  "carol123",  emp_role.id),
+            ("Opti Admin",    "admin@gmail.com",  "admin123",  admin_role.id),
+            ("John", "john@gmail.com",  "john123",  emp_role.id),
+            ("Ram",  "Ram@gmail.com",    "ram12",    emp_role.id),
+            ("Akash",   "akash@gmail.com",  "akash123",  emp_role.id),
         ]
         user_map = {}
         for full_name, email, pwd, role_id in users_data:
