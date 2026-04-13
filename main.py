@@ -11,14 +11,12 @@ def auto_seed():
     from core.security import hash_password
     db = SessionLocal()
     try:
-        # If users already exist, skip entirely
         if db.query(User).first():
             print("✅ DB already seeded")
             return
 
         print("🌱 Seeding...")
 
-        # GET OR CREATE permissions (safe if already exist)
         def get_or_create_perm(name, desc):
             p = db.query(Permission).filter(Permission.name == name).first()
             if not p:
@@ -39,7 +37,6 @@ def auto_seed():
             ]
         }
 
-        # GET OR CREATE roles
         admin_role = db.query(Role).filter(Role.name == "Admin").first()
         if not admin_role:
             admin_role = Role(name="Admin")
@@ -56,7 +53,6 @@ def auto_seed():
 
         db.commit()
 
-        # CREATE users
         users_data = [
             ("Opti Admin",    "admin@opti.com",  "admin123",  admin_role.id),
             ("Alice Johnson", "alice@opti.com",  "alice123",  emp_role.id),
@@ -74,7 +70,6 @@ def auto_seed():
             user_map[email] = u
         db.commit()
 
-        # CREATE assets
         assets_data = [
             ('MacBook Pro 14"', 'OPTI-001','Laptop',   'assigned', 2499.99, user_map['alice@opti.com'].id),
             ('Dell XPS 15',     'OPTI-002','Laptop',   'assigned', 1899.00, user_map['bob@opti.com'].id),
@@ -146,5 +141,34 @@ def health():
     try:
         count = db.query(User).count()
         return {"status": "ok", "users_in_db": count}
+    finally:
+        db.close()
+
+@app.get("/reset-seed", tags=["Health"])
+def reset_seed():
+    from models import Permission, Role, User, Asset
+    from sqlalchemy import text
+    db = SessionLocal()
+    try:
+        db.execute(text("DELETE FROM assets"))
+        db.execute(text("DELETE FROM users"))
+        db.execute(text("DELETE FROM role_permissions"))
+        db.execute(text("DELETE FROM roles"))
+        db.execute(text("DELETE FROM permissions"))
+        db.commit()
+        print("🗑️ Cleared all data")
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Clear error: {e}")
+    finally:
+        db.close()
+
+    auto_seed()
+
+    from models import User
+    db = SessionLocal()
+    try:
+        count = db.query(User).count()
+        return {"reset": True, "users_in_db": count}
     finally:
         db.close()
