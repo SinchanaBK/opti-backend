@@ -6,3 +6,4 @@ sqlalchemy==2.0.29
 email-validator==2.1.1
 python-jose
 psycopg2-binary
+passlib[bcrypt]
