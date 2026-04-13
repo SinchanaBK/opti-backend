@@ -12,15 +12,19 @@ def auto_seed():
     db = SessionLocal()
     try:
         if db.query(User).first():
+            print("✅ DB already seeded")
             return
-        print("🌱 Seeding database...")
-        PERMS = [
-            ("view:inventory","View all assets"),("view:my_gear","View own assets"),
-            ("create:asset","Add assets"),("update:asset","Edit assets"),
-            ("delete:asset","Remove assets"),("manage:users","Manage users"),
+        print("🌱 Seeding...")
+        perms_data = [
+            ("view:inventory","View all assets"),
+            ("view:my_gear","View own assets"),
+            ("create:asset","Add assets"),
+            ("update:asset","Edit assets"),
+            ("delete:asset","Remove assets"),
+            ("manage:users","Manage users"),
         ]
         perms = {}
-        for name, desc in PERMS:
+        for name, desc in perms_data:
             p = Permission(name=name, description=desc)
             db.add(p); db.flush(); perms[name] = p
 
@@ -33,47 +37,44 @@ def auto_seed():
         emp_role.permissions = [perms["view:my_gear"]]
         db.commit()
 
-        USERS = [
-            ("Opti Admin","admin@opti.com","admin123",admin_role.id),
-            ("John","john@opti.com","john123",emp_role.id),
-            ("Akash","akash@opti.com","akash123",emp_role.id),
+        users_data = [
+            ("Opti Admin",   "admin@gmail.com", "admin123", admin_role.id),
+            ("John","john@gmail.com", "john123", emp_role.id),
+            ("Akash", "akash@gmail.com",   "akash123",   emp_role.id),
             
         ]
         user_map = {}
-        for full_name, email, pwd, role_id in USERS:
+        for full_name, email, pwd, role_id in users_data:
             u = User(full_name=full_name, email=email,
                      hashed_password=hash_password(pwd), role_id=role_id)
             db.add(u); db.flush(); user_map[email] = u
         db.commit()
 
-        ASSETS = [
-            ('MacBook Pro 14"','OPTI-001','Laptop','assigned',2499.99,user_map['alice@opti.com'].id),
-            ('Dell XPS 15','OPTI-002','Laptop','assigned',1899.00,user_map['bob@opti.com'].id),
-            ('LG UltraWide 34"','OPTI-003','Monitor','available',699.00,None),
-            ('iPhone 15 Pro','OPTI-004','Phone','assigned',999.00,user_map['carol@opti.com'].id),
-            ('Logitech MX Keys','OPTI-005','Keyboard','available',109.99,None),
-            ('Sony WH-1000XM5','OPTI-006','Headset','assigned',349.99,user_map['alice@opti.com'].id),
-            ('Standing Desk','OPTI-007','Furniture','available',799.00,None),
-            ('Cisco IP Phone','OPTI-008','Phone','retired',149.99,None),
-            ('Samsung 27" 4K','OPTI-009','Monitor','assigned',549.00,user_map['bob@opti.com'].id),
-            ('Ergonomic Chair','OPTI-010','Furniture','available',599.00,None),
+        assets_data = [
+            ('MacBook Pro 14"', 'OPTI-001','Laptop',   'assigned', 2499.99, user_map['alice@opti.com'].id),
+            ('Dell XPS 15',     'OPTI-002','Laptop',   'assigned', 1899.00, user_map['bob@opti.com'].id),
+            ('LG UltraWide',    'OPTI-003','Monitor',  'available', 699.00, None),
+            ('iPhone 15 Pro',   'OPTI-004','Phone',    'assigned',  999.00, user_map['carol@opti.com'].id),
+            ('Sony WH-1000XM5', 'OPTI-006','Headset',  'assigned',  349.99, user_map['alice@opti.com'].id),
+            ('Standing Desk',   'OPTI-007','Furniture','available', 799.00, None),
+            ('Samsung 27" 4K',  'OPTI-009','Monitor',  'assigned',  549.00, user_map['bob@opti.com'].id),
+            ('Ergonomic Chair', 'OPTI-010','Furniture','available', 599.00, None),
         ]
-        for name, tag, cat, status, value, uid in ASSETS:
+        for name, tag, cat, status, value, uid in assets_data:
             db.add(Asset(name=name, asset_tag=tag, category=cat,
                          status=status, value=value, assigned_to_id=uid))
         db.commit()
         print("✅ Seeded!  admin@opti.com / admin123")
     except Exception as e:
-        db.rollback(); print(f"⚠️ Seed error: {e}")
+        db.rollback()
+        print(f"❌ Seed failed: {e}")
+        import traceback; traceback.print_exc()
     finally:
         db.close()
 
 auto_seed()
 
-app = FastAPI(
-    title="Opti Asset Management API",
-    version="1.0.0",
-)
+app = FastAPI(title="Opti Asset Management API", version="1.0.0")
 
 _env_origins = os.getenv("ALLOWED_ORIGINS", "")
 _extra = [o.strip() for o in _env_origins.split(",") if o.strip()]
@@ -91,9 +92,11 @@ app.add_middleware(
     allow_origin_regex=r"https://opti-frontend.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin",
-                   "X-Requested-With", "Access-Control-Request-Method",
-                   "Access-Control-Request-Headers"],
+    allow_headers=[
+        "Authorization", "Content-Type", "Accept", "Origin",
+        "X-Requested-With", "Access-Control-Request-Method",
+        "Access-Control-Request-Headers",
+    ],
     expose_headers=["Authorization"],
     max_age=3600,
 )
@@ -105,4 +108,14 @@ app.include_router(dashboard_router.router)
 
 @app.get("/", tags=["Health"])
 def root():
-    return {"status": "ok", "message": "Opti Asset Management API is running"}
+    return {"status": "ok", "message": "Opti API running"}
+
+@app.get("/health", tags=["Health"])
+def health():
+    from models import User
+    db = SessionLocal()
+    try:
+        count = db.query(User).count()
+        return {"status": "ok", "users_in_db": count}
+    finally:
+        db.close()
