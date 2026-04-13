@@ -7,7 +7,7 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Opti Asset Management API",
-    description="RBAC-powered asset management system",
+    description="RBAC",
     version="1.0.0",
 )
 
